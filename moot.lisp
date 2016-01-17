@@ -1,7 +1,7 @@
 (in-package #:hasty)
 
-;; Tick driven Systems perform a pass when the moot's tick function is
-;; called
+;; {TODO} Tick driven Systems perform a pass when the moot's tick function is
+;;        called
 
 (defun %make-systems-array (&optional systems)
   (make-array (length systems) :element-type '%system
