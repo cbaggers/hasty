@@ -16,21 +16,33 @@
 
 (defmacro def-system (name (primary-component-type &key friends)
 		      &body pass-body)
+  (assert (and (symbolp name)
+	       (symbolp primary-component-type)
+	       (every #'symbolp friends)
+	       (not (member name friends))))
   (let ((primary primary-component-type)
 	(hidden-init (symb :%make- name))
 	(init (symb :make- name))
-	(pass (gensym "pass")))
-    `(progn
-       (defstruct (,name (:include %system) (:constructor ,hidden-init))
-	 )
+	(pass (gensym "pass"))
+	(predicate (symb name :-p)))
+    `(let ((created nil))
+       (defstruct (,name (:include %system) (:constructor ,hidden-init)))
+
        (defun ,pass (entity)
 	 ;; TODO: add setf'able with-* stuff for primary, and
 	 ;;       add readonly with-* stuff for friends
-	 ,@body)
+	 ,@pass-body)
+
        (defun ,init ()
+	 (when created
+	   (error ,(format nil "system for ~s has already been instantiated"
+			   primary)))
+	 (setf created t)
 	 (,hidden-init
 	  :entities (%rummage-master #',predicate)
-	  :pass-function #',pass)))))
+	  :pass-function #',pass
+	  :friends ',friends)))))
+
 
 
 
