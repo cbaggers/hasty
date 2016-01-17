@@ -148,10 +148,12 @@
 	    (error ,(format nil "system for ~s has already been instantiated"
 			    primary)))
 	  (setf created t)
-	  (,hidden-init
-	   :entities (%rummage-master #',predicate)
-	   :pass-function #',pass
-	   :friends ',friends))))))
+	  (%add-system
+	   (,hidden-init
+	    :entities (%rummage-master #',predicate)
+	    :pass-function #',pass
+	    :friends ',friends)))
+	(,init)))))
 
 ;;----------------------------------------------------------------------
 ;; Event-driven-system
