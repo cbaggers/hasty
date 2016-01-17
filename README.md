@@ -1,3 +1,3 @@
 # Hasty
 
-An entity component system for common lisp
+An *ent*ity component system for common lisp

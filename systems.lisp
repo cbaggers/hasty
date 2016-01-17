@@ -14,9 +14,23 @@
 ;; systems to be only able to modify one type of component but
 ;; view many what they can view has to be declared.
 
-(defmacro def-system (name primary-component-type &key friends depends-on)
-  `(defstruct (,name (:include %system)))
-  )
+(defmacro def-system (name (primary-component-type &key friends)
+		      &body pass-body)
+  (let ((primary primary-component-type)
+	(hidden-init (symb :%make- name))
+	(init (symb :make- name))
+	(pass (gensym "pass")))
+    `(progn
+       (defstruct (,name (:include %system) (:constructor ,hidden-init))
+	 )
+       (defun ,pass (entity)
+	 ;; TODO: add setf'able with-* stuff for primary, and
+	 ;;       add readonly with-* stuff for friends
+	 ,@body)
+       (defun ,init ()
+	 (,hidden-init
+	  :entities (%rummage-master #',predicate)
+	  :pass-function #',pass)))))
 
 
 
