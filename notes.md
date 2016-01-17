@@ -1,5 +1,3 @@
-
-
 Moot   ----- holds all the systems
 |
 System ----- 1 for each component type
