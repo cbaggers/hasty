@@ -1,6 +1,11 @@
 (in-package #:hasty)
 (named-readtables:in-readtable fn-reader)
 
+;; (def-component test9 ()
+;;     ((x 0s0 :type single-float)
+;;      (y 0s0 :type single-float))
+;;   (update-test9 (+ test9-x 1) (+ test9-y 2)))
+
 ;; TODO:
 ;; dependant components: When you add a component to an entity you need
 ;;                       to check that the friend's of your component's
@@ -62,6 +67,8 @@
 	     (let ((component (,init ,@init-pairs)))
 	       (add-item-to-%component-bag-at
 		(entity-components entity-to-add-to) component ,id))
+	     (unless-release
+	       (setf (entity-dirty entity-to-add-to) t))
 	     entity-to-add-to)
 
 	   (defun ,remove (entity-to-remove-from)
@@ -78,6 +85,9 @@
 
 	   (defmethod %get-component-remover ((component-type (eql ',name)))
 	     #',remove)
+
+	   (defmethod %get-friends ((component ,name))
+	     ',friends)
 
 	   ,@(def-system system-name with update hidden-init name friends
 			 pass-body hidden-slot-names original-slot-names
@@ -142,3 +152,9 @@
 	   :entities (%rummage-master #',predicate)
 	   :pass-function #',pass
 	   :friends ',friends))))))
+
+;;----------------------------------------------------------------------
+;; Event-driven-system
+
+;; Event-driven systems only run passes when a certain event is
+;; triggered

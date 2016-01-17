@@ -9,9 +9,26 @@
 ;;----------------------------------------------------------------------
 
 (defstruct entity
-  (components (bag-of-%component!) :type %component-bag))
+  (components (bag-of-%component!) :type %component-bag)
+  (dirty nil :type boolean))
 
 (def-typed-bag entity-bag entity (make-entity))
+
+(defun %check-component-friendships-of-entity (entity)
+  (let ((components (get-items-from-%component-bag (entity-components entity))))
+    (labels ((friend-present-in-entity (friend)
+	       (member friend components
+		       :test (lambda (x) (typep x friend))))
+	     (component-friendships-present (component)
+	       (every #'friend-present-in-entity (%get-friends component))))
+      (if (every #'component-friendships-present components)
+	  (setf (entity-dirty entity) nil)
+	  (error "The entity has the following components with missing friends:~%~s"
+		 entity)))))
+
+;; {TODO} entities can recieve messages from the moot, these are for moot wide
+;;        things like undefining a type and as such dont need to be super
+;;        performant.
 
 ;;----------------------------------------------------------------------
 
@@ -53,6 +70,12 @@ You may have recursive system friendships:
 (let ((id -1))
   (defun %next-id () (incf id))
   (defun %reset-ids () (setf id 0)))
+
+;;----------------------------------------------------------------------
+
+(defmacro unless-release (&body body)
+  (unless grab-bag::+release-mode+
+    `(progn ,@body)))
 
 ;;----------------------------------------------------------------------
 

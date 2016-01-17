@@ -7,4 +7,6 @@
   :serial t
   :depends-on (#:grab-bag #:fn)
   :components ((:file "package")
-               (:file "base")))
+               (:file "base")
+	       (:file "moot")
+	       (:file "components")))

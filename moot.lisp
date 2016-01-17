@@ -9,6 +9,7 @@
 
 (let ((all-entities (bag-of-entity!))
       (systems (%make-systems-array)))
+
   (defun %rummage-master (predicate)
     "used internally by systems"
     (rummage-entity-bag all-entities predicate))
@@ -18,6 +19,9 @@
        (let ((entities (get-items-from-entity-bag (%system-entities system)))
 	     (pass-function (%system-pass-function system)))
 	 (loop :for entity :in entities :do
+	    (unless-release
+	      (when (entity-dirty entity)
+		(%check-component-friendships-of-entity entity)))
 	    (funcall pass-function entity)))))
 
   (defun %add-system (system)
@@ -26,7 +30,8 @@
 	(let ((sorted (sort-systems
 		       (cons system (loop :for s :in systems :collect s)))))
 	  (setf systems (%make-systems-array sorted))
-	  systems)))
+	  systems))
+    system)
 
   (defun %remove-system (system)
     (let ((sorted (sort-systems
