@@ -37,6 +37,7 @@
 	    :type entity-rummager)
   (pass-function (error "system created without pass function")
 		 :type (function (entity) t))
+  (event-based-p nil :type boolean)
   (friends nil :type list))
 
 (defun sort-systems (systems)

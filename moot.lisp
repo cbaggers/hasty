@@ -15,14 +15,22 @@
     (rummage-entity-bag all-entities predicate))
 
   (defun step-hasty ()
-    (loop :for system :in systems :do
-       (let ((entities (get-items-from-entity-bag (%system-entities system)))
-	     (pass-function (%system-pass-function system)))
-	 (loop :for entity :in entities :do
-	    (unless-release
-	      (when (entity-dirty entity)
-		(%check-component-friendships-of-entity entity)))
-	    (funcall pass-function entity)))))
+    (loop :for system :in systems :do (%run-pass system)))
+
+  (defun run-pass (system)
+    (if (%system-event-based-p system)
+	(%run-pass system)
+	(error "Cannot manually trigger pass on non event-based system ~s"
+	       system)))
+
+  (defun %run-pass (system)
+    (let ((entities (get-items-from-entity-bag (%system-entities system)))
+	  (pass-function (%system-pass-function system)))
+      (loop :for entity :in entities :do
+	 (unless-release
+	   (when (entity-dirty entity)
+	     (%check-component-friendships-of-entity entity)))
+	 (funcall pass-function entity))))
 
   (defun add-system (system)
     (if (find system systems :test #'eq)

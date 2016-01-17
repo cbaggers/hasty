@@ -6,14 +6,12 @@
 ;;      (y 0s0 :type single-float))
 ;;   (update-test9 (+ test9-x 1) (+ test9-y 2)))
 
-;; TODO:
-;; dependant components: When you add a component to an entity you need
-;;                       to check that the friend's of your component's
-;;                       system as present
-
-(defmacro def-component (name friends (&rest slot-descriptions) &body pass-body)
+(defmacro def-component (name depends-on (&rest slot-descriptions) &body pass-body)
   (assert (valid-slot-descriptions-p slot-descriptions))
   (let* ((system-name (symb name :-system))
+
+	 (reactive (eq depends-on :event-based))
+	 (friends (if reactive nil depends-on))
 
 	 (id (gensym "id"))
 
@@ -91,7 +89,7 @@
 
 	   ,@(def-system system-name with update hidden-init name friends
 			 pass-body hidden-slot-names original-slot-names
-			 c-inst hidden-slot-names with with-names))))))
+			 c-inst hidden-slot-names with with-names reactive))))))
 
 (defun make-with-component (with-name with-names c-inst getters)
   `((defmacro ,with-name (entity &body body)
@@ -119,7 +117,7 @@
 
 (defun def-system (system-name with update hidden-init primary-component-type
 		   friends pass-body hidden-slot-names original-slot-names
-		   C-INST GETTERS WITH-NAME WITH-NAMES)
+ 		   c-inst getters with-name with-names reactive)
   (assert (and (symbolp primary-component-type)
 	       (every #'symbolp friends)
 	       (not (member primary-component-type friends))))
@@ -153,7 +151,8 @@
 		 (,hidden-init
 		  :entities (%rummage-master #',predicate)
 		  :pass-function #',pass
-		  :friends ',friends))))
+		  :friends ',friends
+		  :event-based-p ,reactive))))
 	(defmethod initialize-system ((name (eql ',system-name)))
 	  (,init))
 	(defun ,get ()
