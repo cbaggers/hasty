@@ -2,4 +2,7 @@
 
 (defpackage #:hasty
   (:use #:cl #:grab-bag #:fn)
-  (:export :entity :step-hasty :def-component))
+  (:export :step-hasty
+	   :entity
+	   :def-component
+	   :add-system :remove-system :initialize-system :get-system))

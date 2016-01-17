@@ -125,6 +125,7 @@
 	       (not (member primary-component-type friends))))
   (let* ((primary primary-component-type)
 	 (init (symb :make- system-name))
+	 (get (symb :get- system-name))
 	 (pass (gensym "pass"))
 	 (predicate (symb system-name :-p))
 	 (body
@@ -147,13 +148,18 @@
 	  (when created
 	    (error ,(format nil "system for ~s has already been instantiated"
 			    primary)))
-	  (setf created t)
-	  (%add-system
-	   (,hidden-init
-	    :entities (%rummage-master #',predicate)
-	    :pass-function #',pass
-	    :friends ',friends)))
-	(,init)))))
+	  (setf created
+		(add-system
+		 (,hidden-init
+		  :entities (%rummage-master #',predicate)
+		  :pass-function #',pass
+		  :friends ',friends))))
+	(defmethod initialize-system ((name (eql ',system-name)))
+	  (,init))
+	(defun ,get ()
+	  (or created (error "system does has not been initialized")))
+	(defmethod get-system ((name (eql ',system-name)))
+	  (,get))))))
 
 ;;----------------------------------------------------------------------
 ;; Event-driven-system

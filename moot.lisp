@@ -24,7 +24,7 @@
 		(%check-component-friendships-of-entity entity)))
 	    (funcall pass-function entity)))))
 
-  (defun %add-system (system)
+  (defun add-system (system)
     (if (find system systems :test #'eq)
 	(error "System has already been added")
 	(let ((sorted (sort-systems
@@ -33,7 +33,7 @@
 	  systems))
     system)
 
-  (defun %remove-system (system)
+  (defun remove-system (system)
     (let ((sorted (sort-systems
 		   (remove system (loop :for s :in systems :collect s)))))
       (setf systems (%make-systems-array sorted))
