@@ -54,9 +54,12 @@
     all-systems))
 
 (defun add-system (system)
-  (if (find system all-systems :test #'eq)
-      (error "System has already been added")
-      (push system pending-systems))
+  (let ((index (position-if (lambda (y) (= (%system-component-id system)
+					   (%system-component-id y)))
+			    all-systems)))
+    (if index
+	(setf (aref all-systems index) system)
+	(push system pending-systems)))
   system)
 
 (defun remove-system (system)

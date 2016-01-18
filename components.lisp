@@ -13,6 +13,8 @@
 	 (reactive (eq depends-on :event-based))
 	 (friends (if reactive nil depends-on))
 
+	 (let-id (symb :%- (format nil "~{~s~^-~}"
+				   (map 'list #'char-code (symbol-name name)))))
 	 (id (gensym "id"))
 
 	 (init (symb :make- name))
@@ -43,9 +45,13 @@
 
        (defstruct (,system-name (:include %system) (:constructor ,hidden-init)))
 
+       ,(unless grab-bag::+release-mode+ `(defvar ,let-id (%next-id)))
+
        (let ((,id ,(if grab-bag::+release-mode+
 		       (%next-id)
-		       `(%next-id))))
+		       `(if (boundp ',let-id)
+			    (symbol-value ',let-id)
+			    (%next-id)))))
 
 	 ;; local get from entity helper func {TODO} should inline this
 	 (labels ((%get-from (entity)
@@ -107,7 +113,7 @@
 	   ,@(def-system system-name with update hidden-init name friends
 			 pass-body hidden-slot-names original-slot-names
 			 c-inst hidden-slot-names with with-names reactive
-			 has))))))
+			 has id))))))
 
 
 (defun make-with-component (with-name with-names c-inst getters)
@@ -140,9 +146,11 @@
 ;; systems to be only able to modify one type of component but
 ;; view many what they can view has to be declared.
 
+(defvar debug-id-source -1)
+
 (defun def-system (system-name with update hidden-init primary-component-type
 		   friends pass-body hidden-slot-names original-slot-names
- 		   c-inst getters with-name with-names reactive has-component)
+ 		   c-inst getters with-name with-names reactive has-component id)
   (assert (and (symbolp primary-component-type)
 	       (every #'symbolp friends)
 	       (not (member primary-component-type friends))))
@@ -178,7 +186,9 @@
 		  :entities (%rummage-master #',predicate)
 		  :pass-function #',pass
 		  :friends ',friends
-		  :event-based-p ,reactive))))
+		  :event-based-p ,reactive
+		  :component-id ,id
+		  :debug-id (incf debug-id-source)))))
 	(defmethod initialize-system ((name (eql ',system-name)))
 	  (,init))
 	(defun ,get ()
