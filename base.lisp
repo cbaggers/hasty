@@ -26,8 +26,7 @@
 (defun %check-component-friendships-of-entity (entity)
   (let ((components (get-items-from-%component-bag (entity-components entity))))
     (labels ((friend-present-in-entity (friend)
-	       (member friend components
-		       :test (lambda (x) (typep x friend))))
+	       (find-if (lambda (x) (typep x friend)) components))
 	     (component-friendships-present (component)
 	       (every #'friend-present-in-entity (%get-friends component))))
       (if (every #'component-friendships-present components)

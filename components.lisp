@@ -59,7 +59,8 @@
 	   ,@(make-with-component with with-names c-inst hidden-slot-names)
 
 	   (defun ,has (entity)
-	     (not (null (%get-from entity))))
+	     (has-item-in-%component-bag-at
+	      (entity-components entity) ,id))
 
 	   (defun ,add (entity-to-add-to &key ,@(mapcar λ`(,_ ,(second _1))
 							original-slot-names
@@ -105,7 +106,8 @@
 
 	   ,@(def-system system-name with update hidden-init name friends
 			 pass-body hidden-slot-names original-slot-names
-			 c-inst hidden-slot-names with with-names reactive))))))
+			 c-inst hidden-slot-names with with-names reactive
+			 has))))))
 
 
 (defun make-with-component (with-name with-names c-inst getters)
@@ -140,7 +142,7 @@
 
 (defun def-system (system-name with update hidden-init primary-component-type
 		   friends pass-body hidden-slot-names original-slot-names
- 		   c-inst getters with-name with-names reactive)
+ 		   c-inst getters with-name with-names reactive has-component)
   (assert (and (symbolp primary-component-type)
 	       (every #'symbolp friends)
 	       (not (member primary-component-type friends))))
@@ -148,7 +150,7 @@
 	 (init (symb :initialize- system-name))
 	 (get (symb :get- system-name))
 	 (pass (gensym "pass"))
-	 (predicate (symb system-name :-p))
+	 (predicate has-component)
 	 (body
 	  (reduce λ`((,(symb :with- _1) entity ,@_))
 		  friends :initial-value pass-body)))
