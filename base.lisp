@@ -1,4 +1,15 @@
 (in-package #:hasty)
+(named-readtables:in-readtable fn:fn-reader)
+;;----------------------------------------------------------------------
+
+(defgeneric component-name (component))
+(defgeneric %set-id (component new-id))
+(defgeneric %get-component-adder (component-type))
+(defgeneric %get-component-remover (component-type))
+(defgeneric %get-friends (component))
+(defgeneric initialize-system (name))
+(defgeneric get-system (name))
+(defgeneric system-name (name))
 
 ;;----------------------------------------------------------------------
 
@@ -8,11 +19,9 @@
 
 ;;----------------------------------------------------------------------
 
-(defstruct entity
+(defstruct (entity (:constructor %make-entity))
   (components (bag-of-%component!) :type %component-bag)
   (dirty nil :type boolean))
-
-(def-typed-bag entity-bag entity (make-entity))
 
 (defun %check-component-friendships-of-entity (entity)
   (let ((components (get-items-from-%component-bag (entity-components entity))))
@@ -25,6 +34,12 @@
 	  (setf (entity-dirty entity) nil)
 	  (error "The entity has the following components with missing friends:~%~s"
 		 entity)))))
+
+(defun make-entity () (%make-entity))
+
+(defun entity! () (make-entity))
+
+(def-typed-bag entity-bag entity (make-entity))
 
 ;; {TODO} entities can recieve messages from the moot, these are for moot wide
 ;;        things like undefining a type and as such dont need to be super
@@ -41,19 +56,23 @@
   (friends nil :type list))
 
 (defun sort-systems (systems)
-  (let* ((scored (make-hash-table))
+  (let* ((scored (make-hash-table :test #'eq))
 	 (to-sort (copy-list systems))
 	 (count 0)
 	 (limit (expt (length systems) 2)))
     (labels ((r (s)
 	       (let ((f (%system-friends s)))
 		 (cond
-		   ((null f) (setf (gethash s scored) 1) nil)
-		   ((every λ(gethash _ scored) f)
+		   ((null f)
+		    (setf (gethash s scored) 1)
+		    nil)
+		   ((every λ(gethash (get-system _) scored) f)
 		    (setf (gethash s scored)
-			  (reduce #'+ (mapcar λ(gethash _ scored) f)))
-		    nil))
-		 s)))
+			  (1+ (reduce #'+ (mapcar
+					   λ(gethash (get-system _) scored)
+					   f))))
+		    nil)
+		   (t s)))))
       (loop :until (or (> count limit) (null to-sort)) :do
 	 (incf count)
 	 (setf to-sort (remove nil (mapcar #'r to-sort))))

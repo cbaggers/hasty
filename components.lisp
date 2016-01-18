@@ -38,14 +38,14 @@
     ;;
     `(progn
        ;; the component itself
-       (defstruct (,name (:conc-name nil))
+       (defstruct (,name (:include %component) (:conc-name nil))
 	 ,@(mapcar λ`(,_ ,@(rest _1)) hidden-slot-names slot-descriptions))
 
        (defstruct (,system-name (:include %system) (:constructor ,hidden-init)))
 
-       (let ((,id `(if grab-bag::+release-mode+
-		    (%next-id)
-		    `(%next-id))))
+       (let ((,id ,(if grab-bag::+release-mode+
+		       (%next-id)
+		       `(%next-id))))
 
 	 ;; local get from entity helper func {TODO} should inline this
 	 (labels ((%get-from (entity)
@@ -53,7 +53,7 @@
 		     (entity-components entity) ,id)))
 
 	   ;; make public getters as component getters are hidden
-	   ,@(mapcar λ`(defun ,_ (entity) (,_1 (%get-from entity)))
+	   ,@(mapcar λ`(defun ,(symb name :- _) (entity) (,_1 (%get-from entity)))
 		     original-slot-names hidden-slot-names)
 
 	   ,@(make-with-component with with-names c-inst hidden-slot-names)
@@ -61,7 +61,9 @@
 	   (defun ,has (entity)
 	     (not (null (%get-from entity))))
 
-	   (defun ,add (entity-to-add-to ,@original-slot-names)
+	   (defun ,add (entity-to-add-to &key ,@(mapcar λ`(,_ ,(second _1))
+							original-slot-names
+							slot-descriptions))
 	     (let ((component (,init ,@init-pairs)))
 	       (add-item-to-%component-bag-at
 		(entity-components entity-to-add-to) component ,id))
@@ -78,10 +80,24 @@
 		    `(defmethod %set-id ((component ,name) new-id)
 		       (error "Updating underlying component ids not yet")))
 
+	   (defmethod component-name ((component ,name))
+	     (declare (ignore component))
+	     ',name)
+
+	   (defmethod component-name ((component ,system-name))
+	     (declare (ignore component))
+	     ',name)
+
+	   (defmethod %get-component-adder ((component ,name))
+	     (declare (ignore component))
+	     #',add)
+
 	   (defmethod %get-component-adder ((component-type (eql ',name)))
+	     (declare (ignore component-type))
 	     #',add)
 
 	   (defmethod %get-component-remover ((component-type (eql ',name)))
+	     (declare (ignore component-type))
 	     #',remove)
 
 	   (defmethod %get-friends ((component ,name))
@@ -90,6 +106,7 @@
 	   ,@(def-system system-name with update hidden-init name friends
 			 pass-body hidden-slot-names original-slot-names
 			 c-inst hidden-slot-names with with-names reactive))))))
+
 
 (defun make-with-component (with-name with-names c-inst getters)
   `((defmacro ,with-name (entity &body body)
@@ -103,12 +120,18 @@
        (declare (ignorable ,c-inst))
        (labels ,(mapcar λ`(,_ () (,_1 ,c-inst))
 			hiding-getter-names getters)
+	 (declare (ignorable
+		   ,@(mapcar λ`(function ,_) hiding-getter-names)))
 	 (symbol-macrolet ,(mapcar λ`(,_ (,_1))
 				   with-names hiding-getter-names)
 	   ,@body)))))
 
 (defun valid-slot-descriptions-p (slot-descriptions)
-  t)
+  (labels ((valid-slot (s)
+	     (destructuring-bind (name default &key type) s
+	       (declare (ignore default type))
+	       (and (listp s) (symbolp name)))))
+    (every #'valid-slot slot-descriptions)))
 
 ;;----------------------------------------------------------------------
 
@@ -122,7 +145,7 @@
 	       (every #'symbolp friends)
 	       (not (member primary-component-type friends))))
   (let* ((primary primary-component-type)
-	 (init (symb :make- system-name))
+	 (init (symb :initialize- system-name))
 	 (get (symb :get- system-name))
 	 (pass (gensym "pass"))
 	 (predicate (symb system-name :-p))
@@ -139,6 +162,7 @@
 			      ,@(mapcar λ`(setf (,_ component) ,_1)
 					hidden-slot-names
 					original-slot-names))))
+		   (declare (ignorable (function ,update)))
 		   ,@body))))
 
       (let ((created nil))
@@ -157,7 +181,7 @@
 	  (,init))
 	(defun ,get ()
 	  (or created (error "system does has not been initialized")))
-	(defmethod get-system ((name (eql ',system-name)))
+	(defmethod get-system ((name (eql ',primary-component-type)))
 	  (,get))))))
 
 ;;----------------------------------------------------------------------

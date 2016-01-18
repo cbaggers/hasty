@@ -9,4 +9,5 @@
   :components ((:file "package")
                (:file "base")
 	       (:file "moot")
-	       (:file "components")))
+	       (:file "components")
+	       (:file "entity")))
