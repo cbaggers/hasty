@@ -8,11 +8,13 @@
 	      :initial-contents systems))
 
 ;; (let ((all-entities (bag-of-entity!))
-;;       (all-systems (%make-systems-array))
+;;       (regular-systems (%make-systems-array))
 ;;       (pending-systems nil)))
 
 (defvar all-entities (bag-of-entity!))
-(defvar all-systems (%make-systems-array))
+(defvar regular-systems (%make-systems-array))
+(defvar reactive-systems
+  (make-array 0 :element-type '%system :adjustable t :fill-pointer 0))
 (defvar pending-systems nil)
 
 (defun %rummage-master (predicate)
@@ -22,12 +24,12 @@
 (defun step-hasty ()
   (when pending-systems
     (%commit-pending-systems))
-  (loop :for system :across all-systems :do (%run-pass system)))
+  (loop :for system :across regular-systems :do (%run-pass system)))
 
 (defun run-pass (system)
-  (if (%system-event-based-p system)
+  (if (%system-reactive-p system)
       (%run-pass system)
-      (error "Cannot manually trigger pass on non event-based system ~s"
+      (error "Cannot manually trigger pass on non reactive system ~s"
 	     system)))
 
 (defun %run-pass (system)
@@ -49,24 +51,29 @@
 (defun %add-systems (systems)
   (let ((sorted (sort-systems
 		 (append systems
-			 (loop :for s :across all-systems :collect s)))))
-    (setf all-systems (%make-systems-array sorted))
-    all-systems))
+			 (loop :for s :across regular-systems :collect s)))))
+    (setf regular-systems (%make-systems-array sorted))
+    regular-systems))
 
 (defun add-system (system)
-  (let ((index (position-if (lambda (y) (= (%system-component-id system)
-					   (%system-component-id y)))
-			    all-systems)))
-    (if index
-	(setf (aref all-systems index) system)
-	(push system pending-systems)))
+  (let* ((reactive (%system-reactive-p system))
+	 (systems-array (if reactive
+			    reactive-systems
+			    regular-systems))
+	 (index (position-if (lambda (y) (= (%system-component-id system)
+					    (%system-component-id y)))
+			     systems-array)))
+    (cond
+      (index (setf (aref systems-array index) system))
+      (reactive (vector-push-extend system reactive-systems))
+      (t (push system pending-systems))))
   system)
 
 (defun remove-system (system)
   (let ((sorted (sort-systems
-		 (remove system (loop :for s :in all-systems :collect s)))))
-    (setf all-systems (%make-systems-array sorted))
-    all-systems))
+		 (remove system (loop :for s :in regular-systems :collect s)))))
+    (setf regular-systems (%make-systems-array sorted))
+    regular-systems))
 
 (defun register-entity (entity)
   (add-item-to-entity-bag all-entities entity)

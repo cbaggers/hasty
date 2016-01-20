@@ -51,7 +51,7 @@
 	    :type entity-rummager)
   (pass-function (error "system created without pass function")
 		 :type (function (entity) t))
-  (event-based-p nil :type boolean)
+  (reactive-p nil :type boolean)
   (friends nil :type list)
   (component-id -1 :type fixnum)
   (debug-id -1 :type fixnum))

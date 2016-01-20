@@ -7,10 +7,13 @@
 ;;   (update-test9 (+ test9-x 1) (+ test9-y 2)))
 
 (defmacro def-component (name depends-on (&rest slot-descriptions) &body pass-body)
+  (assert (and (listp depends-on)
+	       (symbolp (first depends-on))
+	       (not (some #'keywordp (rest depends-on)))))
   (assert (valid-slot-descriptions-p slot-descriptions))
   (let* ((system-name (symb name :-system))
 
-	 (reactive (eq (first depends-on) :event-based))
+	 (reactive (eq (first depends-on) :reactive))
 	 (friends (if reactive (rest depends-on) depends-on))
 
 	 (let-id (symb :%- (format nil "~{~s~^-~}"
@@ -186,7 +189,7 @@
 		  :entities (%rummage-master #',predicate)
 		  :pass-function #',pass
 		  :friends ',friends
-		  :event-based-p ,reactive
+		  :reactive-p ,reactive
 		  :component-id ,id
 		  :debug-id (incf debug-id-source)))))
 	(defmethod initialize-system ((name (eql ',system-name)))
@@ -194,10 +197,6 @@
 	(defun ,get ()
 	  (or created (error "system does has not been initialized")))
 	(defmethod get-system ((name (eql ',primary-component-type)))
+	  (,get))
+	(defmethod get-system ((name ,primary-component-type))
 	  (,get))))))
-
-;;----------------------------------------------------------------------
-;; Event-driven-system
-
-;; Event-driven systems only run passes when a certain event is
-;; triggered
