@@ -6,10 +6,15 @@
 ;;      (y 0s0 :type single-float))
 ;;   (update-test9 (+ test9-x 1) (+ test9-y 2)))
 
+(defvar debug-id-source -1)
+
 (defmacro def-component (name depends-on (&rest slot-descriptions) &body pass-body)
   (assert (and (listp depends-on)
 	       (symbolp (first depends-on))
-	       (not (some #'keywordp (rest depends-on)))))
+	       (not (some #'keywordp (rest depends-on)))
+	       (symbolp name)
+	       (every #'symbolp depends-on)
+	       (not (member name depends-on))))
   (assert (valid-slot-descriptions-p slot-descriptions))
   (let* ((system-name (symb name :-system))
 
@@ -36,11 +41,10 @@
 	 (init-pairs (mapcan λ`(,(kwd _) ,_1)
 			     hidden-slot-names
 			     original-slot-names))
-	 (with-names (mapcar λ(symb name :- _) original-slot-names))
 
-	 (c-inst (gensym "component")))
-
-    ;;
+	 (system-init (symb :initialize- system-name))
+	 (get-system (symb :get- system-name))
+	 (pass (gensym "pass")))
     `(progn
        ;; the component itself
        (defstruct (,name (:include %component) (:conc-name nil))
@@ -65,7 +69,10 @@
 	   ,@(mapcar λ`(defun ,(symb name :- _) (entity) (,_1 (%get-from entity)))
 		     original-slot-names hidden-slot-names)
 
-	   ,@(make-with-component with with-names c-inst hidden-slot-names)
+	   (defmacro ,with (entity &body body)
+	     (gen-slot-accessors
+	      entity ',name ',original-slot-names
+	      ',hidden-slot-names t body))
 
 	   (defun ,has (entity)
 	     (has-item-in-%component-bag-at
@@ -113,28 +120,70 @@
 	   (defmethod %get-friends ((component ,name))
 	     ',friends)
 
-	   ,@(def-system system-name with update hidden-init name friends
-			 pass-body hidden-slot-names original-slot-names
-			 c-inst hidden-slot-names with with-names reactive
-			 has id))))))
+	   (defun ,pass (entity)
+	     ;; cant use our with-macro from earlier as it's not yet compiled
+	     ;; so we locally define it here and use it immediately
+	     (macrolet ((,with (entity &body body)
+			  (gen-slot-accessors
+			   entity ',name ',original-slot-names
+			   ',hidden-slot-names nil body)))
+	       (,with entity
+		      (labels ((,update (,@original-slot-names)
+				 (let ((component (%get-from entity)))
+				   ,@(mapcar λ`(setf (,_ component) ,_1)
+					     hidden-slot-names
+					     original-slot-names))))
+			(declare (ignorable (function ,update)))
+			,@pass-body))))
+
+	   (let ((created nil))
+	     (defun ,system-init ()
+	       (when created
+		 (error ,(format nil "system for ~s has already been instantiated"
+				 name)))
+	       (setf created
+		     (add-system
+		      (,hidden-init
+		       :entities (%rummage-master #',has)
+		       :pass-function #',pass
+		       :friends ',friends
+		       :reactive-p ,reactive
+		       :component-id ,id
+		       :debug-id (incf debug-id-source)))))
+	     (,system-init)
+	     (defmethod initialize-system ((name (eql ',system-name)))
+	       (,system-init))
+	     (defun ,get-system ()
+	       (or created (error "system does has not been initialized")))
+	     (defmethod get-system ((name (eql ',name)))
+	       (,get-system))
+	     (defmethod get-system ((name ,name))
+	       (,get-system))))))))
 
 
-(defun make-with-component (with-name with-names c-inst getters)
-  `((defmacro ,with-name (entity &body body)
-      (make-with-component-internals entity ',with-names ',c-inst ',getters body))))
-
-
-(defun make-with-component-internals (entity with-names c-inst getters body)
-  (let* ((hiding-getter-names
-	  (mapcar λ(gensym (symbol-name _)) with-names)))
+(defun gen-slot-accessors (entity component-type-name
+			   human-slot-names gensym-slot-names
+			   prefix-type-name-p body)
+  (let* ((gensym-func-names (mapcar λ(gensym (symbol-name _))
+				      human-slot-names))
+	 (c-inst (gensym "component")))
+    ;; get this component from the entity
     `(let* ((,c-inst (%get-from ,entity)))
        (declare (ignorable ,c-inst))
+       ;; make the functions to access the slots, we need this
+       ;; as otherwise you could setf
        (labels ,(mapcar λ`(,_ () (,_1 ,c-inst))
-			hiding-getter-names getters)
+			gensym-func-names gensym-slot-names)
 	 (declare (ignorable
-		   ,@(mapcar λ`(function ,_) hiding-getter-names)))
-	 (symbol-macrolet ,(mapcar λ`(,_ (,_1))
-				   with-names hiding-getter-names)
+		   ,@(mapcar λ`(function ,_) gensym-func-names)))
+	 ;; make symbol macros so we can use the above functions like
+	 ;; symbols again
+	 (symbol-macrolet ,(mapcar λ`(,(if prefix-type-name-p
+					   (symb component-type-name :- _)
+					   _)
+				       (,_1))
+				   human-slot-names
+				   gensym-func-names)
 	   ,@body)))))
 
 (defun valid-slot-descriptions-p (slot-descriptions)
@@ -143,60 +192,3 @@
 	       (declare (ignore default type))
 	       (and (listp s) (symbolp name)))))
     (every #'valid-slot slot-descriptions)))
-
-;;----------------------------------------------------------------------
-
-;; systems to be only able to modify one type of component but
-;; view many what they can view has to be declared.
-
-(defvar debug-id-source -1)
-
-(defun def-system (system-name with update hidden-init primary-component-type
-		   friends pass-body hidden-slot-names original-slot-names
- 		   c-inst getters with-name with-names reactive has-component id)
-  (assert (and (symbolp primary-component-type)
-	       (every #'symbolp friends)
-	       (not (member primary-component-type friends))))
-  (let* ((primary primary-component-type)
-	 (init (symb :initialize- system-name))
-	 (get (symb :get- system-name))
-	 (pass (gensym "pass"))
-	 (predicate has-component)
-	 (body
-	  (reduce λ`((,(symb :with- _1) entity ,@_))
-		  friends :initial-value pass-body)))
-    `((defun ,pass (entity)
-	(macrolet ((,with-name (entity &body body)
-		     (make-with-component-internals
-		      entity ',with-names ',c-inst ',getters body)))
-	  (,with entity
-		 (labels ((,update (,@original-slot-names)
-			    (let ((component (%get-from entity)))
-			      ,@(mapcar λ`(setf (,_ component) ,_1)
-					hidden-slot-names
-					original-slot-names))))
-		   (declare (ignorable (function ,update)))
-		   ,@body))))
-
-      (let ((created nil))
-	(defun ,init ()
-	  (when created
-	    (error ,(format nil "system for ~s has already been instantiated"
-			    primary)))
-	  (setf created
-		(add-system
-		 (,hidden-init
-		  :entities (%rummage-master #',predicate)
-		  :pass-function #',pass
-		  :friends ',friends
-		  :reactive-p ,reactive
-		  :component-id ,id
-		  :debug-id (incf debug-id-source)))))
-	(defmethod initialize-system ((name (eql ',system-name)))
-	  (,init))
-	(defun ,get ()
-	  (or created (error "system does has not been initialized")))
-	(defmethod get-system ((name (eql ',primary-component-type)))
-	  (,get))
-	(defmethod get-system ((name ,primary-component-type))
-	  (,get))))))
