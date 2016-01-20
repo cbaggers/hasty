@@ -30,7 +30,7 @@
 
 	 (with (symb :with- name))
 
-	 (update (symb :update- name))
+	 (update (symb :update))
 	 (has (symb :has- name))
 	 (add (symb :add- name))
 	 (remove (symb :remove- name))
@@ -44,7 +44,8 @@
 
 	 (system-init (symb :initialize- system-name))
 	 (get-system (symb :get- system-name))
-	 (pass (gensym "pass")))
+	 (pass (gensym "pass"))
+	 (entity (symb :entity)))
     `(progn
        ;; the component itself
        (defstruct (,name (:include %component) (:conc-name nil))
@@ -69,10 +70,13 @@
 	   ,@(mapcar λ`(defun ,(symb name :- _) (entity) (,_1 (%get-from entity)))
 		     original-slot-names hidden-slot-names)
 
-	   (defmacro ,with (entity &body body)
-	     (gen-slot-accessors
-	      entity ',name ',original-slot-names
-	      ',hidden-slot-names t body))
+	   (defmacro ,with (entity slot-names &body body)
+	     (unless (and (listp slot-names)
+			  (>= (length slot-names) 1)
+			  (every (lambda (x) (find x ',original-slot-names))
+				 slot-names))
+	       (error ,(format nil "~%~s:~%Invalid slot names. Must be a list of one or more of the following:~%~s" with original-slot-names)))
+	     (gen-slot-accessors entity slot-names ',hidden-slot-names body))
 
 	   (defun ,has (entity)
 	     (has-item-in-%component-bag-at
@@ -120,16 +124,15 @@
 	   (defmethod %get-friends ((component ,name))
 	     ',friends)
 
-	   (defun ,pass (entity)
+	   (defun ,pass (,entity)
 	     ;; cant use our with-macro from earlier as it's not yet compiled
 	     ;; so we locally define it here and use it immediately
-	     (macrolet ((,with (entity &body body)
+	     (macrolet ((,with (,entity &body body)
 			  (gen-slot-accessors
-			   entity ',name ',original-slot-names
-			   ',hidden-slot-names nil body)))
-	       (,with entity
+			   ,entity ',original-slot-names ',hidden-slot-names body)))
+	       (,with ,entity
 		      (labels ((,update (,@original-slot-names)
-				 (let ((component (%get-from entity)))
+				 (let ((component (%get-from ,entity)))
 				   ,@(mapcar λ`(setf (,_ component) ,_1)
 					     hidden-slot-names
 					     original-slot-names))))
@@ -161,9 +164,7 @@
 	       (,get-system))))))))
 
 
-(defun gen-slot-accessors (entity component-type-name
-			   human-slot-names gensym-slot-names
-			   prefix-type-name-p body)
+(defun gen-slot-accessors (entity human-slot-names gensym-slot-names body)
   (let* ((gensym-func-names (mapcar λ(gensym (symbol-name _))
 				      human-slot-names))
 	 (c-inst (gensym "component")))
@@ -178,10 +179,7 @@
 		   ,@(mapcar λ`(function ,_) gensym-func-names)))
 	 ;; make symbol macros so we can use the above functions like
 	 ;; symbols again
-	 (symbol-macrolet ,(mapcar λ`(,(if prefix-type-name-p
-					   (symb component-type-name :- _)
-					   _)
-				       (,_1))
+	 (symbol-macrolet ,(mapcar λ`(,_ (,_1))
 				   human-slot-names
 				   gensym-func-names)
 	   ,@body)))))

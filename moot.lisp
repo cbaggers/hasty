@@ -56,17 +56,20 @@
     regular-systems))
 
 (defun add-system (system)
-  (let* ((reactive (%system-reactive-p system))
-	 (systems-array (if reactive
-			    reactive-systems
-			    regular-systems))
-	 (index (position-if (lambda (y) (= (%system-component-id system)
-					    (%system-component-id y)))
-			     systems-array)))
-    (cond
-      (index (setf (aref systems-array index) system))
-      (reactive (vector-push-extend system reactive-systems))
-      (t (push system pending-systems))))
+  (labels ((system-eq (x y) (= (%system-component-id x)
+			       (%system-component-id y))))
+    (let* ((reactive (%system-reactive-p system))
+	   (systems-array (if reactive
+			      reactive-systems
+			      regular-systems))
+	   (index (position-if (lambda (x) (system-eq x system))
+			       systems-array)))
+      (cond
+	(index (setf (aref systems-array index) system))
+	(reactive (vector-push-extend system reactive-systems))
+	(t (setf pending-systems
+		 (remove-duplicates (cons system pending-systems)
+				    :test #'system-eq :from-end t))))))
   system)
 
 (defun remove-system (system)
