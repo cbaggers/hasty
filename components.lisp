@@ -4,7 +4,7 @@
 ;; (def-component test9 ()
 ;;     ((x 0s0 :type single-float)
 ;;      (y 0s0 :type single-float))
-;;   (update-test9 (+ test9-x 1) (+ test9-y 2)))
+;;   (update (+ x 1) (+ y 2)))
 
 (defvar debug-id-source -1)
 
@@ -41,10 +41,12 @@
 	 (init-pairs (mapcan λ`(,(kwd _) ,_1)
 			     hidden-slot-names
 			     original-slot-names))
+	 (update-args (mapcar λ`(,_ nil ,(symb :set _)) original-slot-names))
 
 	 (system-init (symb :initialize- system-name))
 	 (get-system (symb :get- system-name))
 	 (pass (gensym "pass"))
+	 (component (gensym "component"))
 	 (entity (symb :entity)))
     `(progn
        ;; the component itself
@@ -130,14 +132,16 @@
 	     (macrolet ((,with (,entity &body body)
 			  (gen-slot-accessors
 			   ,entity ',original-slot-names ',hidden-slot-names body)))
-	       (,with ,entity
-		      (labels ((,update (,@original-slot-names)
-				 (let ((component (%get-from ,entity)))
-				   ,@(mapcar λ`(setf (,_ component) ,_1)
-					     hidden-slot-names
-					     original-slot-names))))
-			(declare (ignorable (function ,update)))
-			,@pass-body))))
+	       (let ((,component (%get-from ,entity)))
+		 (,with ,entity
+			(labels ((,update (&key ,@update-args)
+				   ,@(mapcar
+				      λ`(when ,(third _1)
+					  (setf (,_ ,component) ,(first _1)))
+				      hidden-slot-names
+				      update-args)))
+			  (declare (ignorable (function ,update)))
+			  ,@pass-body)))))
 
 	   (let ((created nil))
 	     (defun ,system-init ()
