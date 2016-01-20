@@ -1,7 +1,7 @@
 ;;;; package.lisp
 
 (defpackage #:hasty
-  (:use #:cl #:grab-bag #:fn)
+  (:use #:cl #:grab-bag #:fn #:structy-defclass)
   (:export :step-hasty :run-pass
 	   :entity :make-entity :entity! :register-entity
 	   :def-component :component-name

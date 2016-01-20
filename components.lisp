@@ -10,8 +10,8 @@
   (assert (valid-slot-descriptions-p slot-descriptions))
   (let* ((system-name (symb name :-system))
 
-	 (reactive (eq depends-on :event-based))
-	 (friends (if reactive nil depends-on))
+	 (reactive (eq (first depends-on) :event-based))
+	 (friends (if reactive (rest depends-on) depends-on))
 
 	 (let-id (symb :%- (format nil "~{~s~^-~}"
 				   (map 'list #'char-code (symbol-name name)))))

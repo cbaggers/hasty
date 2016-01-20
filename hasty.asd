@@ -5,7 +5,7 @@
   :author "Baggers <techsnuffle@gmail.com>"
   :license "BSD 2 Clause"
   :serial t
-  :depends-on (#:grab-bag #:fn)
+  :depends-on (#:grab-bag #:fn #:structy-defclass)
   :components ((:file "package")
                (:file "base")
 	       (:file "moot")
