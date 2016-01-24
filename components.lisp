@@ -12,6 +12,10 @@
 
 (defvar debug-id-source -1)
 
+(defun hidden-name (x)
+  (intern (format nil "~a-~a" (package-name (symbol-package x)) (symbol-name x))
+	  (find-package :hasty-hidden)))
+
 (defmacro def-component (name-and-options depends-on (&rest slot-descriptions)
 			 &body pass-body)
   (destructuring-bind (name &key optimize) (if (listp name-and-options)
@@ -47,8 +51,7 @@
 	   (remove (symb :remove- name))
 
 	   (original-slot-names (mapcar #'first slot-descriptions))
-	   (hidden-slot-names (mapcar λ(gensym (symbol-name _))
-				      original-slot-names))
+	   (hidden-slot-names (mapcar #'hidden-name original-slot-names))
 
 	   (init-args (mapcar λ`(,_ ,(second _1))
 			      original-slot-names
@@ -129,7 +132,8 @@
 				   slot-names))
 		 (error ,(format nil "~%~s:~%Invalid slot names. Must be a list of one or more of the following:~%~s~%You gave~~s" with original-slot-names)
 			slot-names))
-	       (gen-slot-accessors entity slot-names ',hidden-slot-names body))
+	       (gen-slot-accessors entity slot-names ',original-slot-names
+				   ',hidden-slot-names body ,id))
 
 	     (defun ,has (entity)
 	       (has-item-in-%component-bag-at
@@ -180,7 +184,8 @@
 	       ;; so we locally define it here and use it immediately
 	       (macrolet ((,with (,entity &body body)
 			    (gen-slot-accessors
-			     ,entity ',original-slot-names ',hidden-slot-names body)))
+			     ,entity ',original-slot-names ',original-slot-names
+			     ',hidden-slot-names body ',id)))
 		 (let ((,component (%get-from ,entity)))
 		   (,with ,entity
 			  (labels ((,update (&key ,@update-args)
@@ -216,13 +221,20 @@
 	       (defmethod get-system ((name ,name))
 		 (,get-system)))))))))
 
+(defun gen-slot-accessors (entity needed-slots human-slot-names
+			   gensym-slot-names body id)
+  (let* ((name-pairs (mapcar #'list human-slot-names gensym-slot-names))
+	 (needed (intersection name-pairs needed-slots
+			       :test λ(eq (car _) _1)))
+	 (human-slot-names (mapcar #'first needed))
+	 (gensym-slot-names (mapcar #'second needed))
+	 (gensym-func-names (mapcar λ(gensym (symbol-name _))
+				    human-slot-names))
 
-(defun gen-slot-accessors (entity human-slot-names gensym-slot-names body)
-  (let* ((gensym-func-names (mapcar λ(gensym (symbol-name _))
-				      human-slot-names))
 	 (c-inst (gensym "component")))
     ;; get this component from the entity
-    `(let* ((,c-inst (%get-from ,entity)))
+    `(let* ((,c-inst (get-item-from-%component-bag-at
+		      (entity-components ,entity) ,id)))
        (declare (ignorable ,c-inst))
        ;; make the functions to access the slots, we need this
        ;; as otherwise you could setf
