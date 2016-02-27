@@ -76,7 +76,7 @@
 
 	   (system-init (symb :initialize- system-name))
 	   (get-system (symb :get- system-name))
-	   (pass (hidden-name 'pass))
+	   (pass (hidden-name (symb name :-PASS)))
 	   (component (gensym "component"))
 	   (entity (symb :entity)))
       `(progn
