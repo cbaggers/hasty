@@ -105,3 +105,22 @@ You may have recursive system friendships:
 
 (defun kwd (&rest args)
   (intern (format nil "~{~a~}" args) 'keyword))
+
+;;----------------------------------------------------------------------
+
+(defmacro bind-many (args list &body body)
+  (labels ((&-p (x)
+	     (when (symbolp x)
+	       (char= #\& (aref (symbol-name x) 0)))))
+    (let* ((clean-args (remove-if #'&-p args))
+	   (clean-names (mapcar λ(if (listp _) (first _) _) clean-args))
+	   (gsyms (mapcar λ(gensym (symbol-name _)) clean-names))
+	   (extract (gensym "extract")))
+      `(let ,gsyms
+	 (labels ((,extract ,args
+		    ,@(loop :for g :in gsyms :for a :in clean-names :collect
+			 `(push ,a ,g))))
+	   (loop :for x :in ,list :do (apply #',extract x))
+	   (let ,(loop :for g :in gsyms :for a :in clean-names :collect
+		    `(,a (reverse ,g)))
+	     ,@body))))))
