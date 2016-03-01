@@ -118,22 +118,23 @@
 				(%next-id)))))
 
 	     (progn
-	       (defmacro ,with (slot-names entity &body body)
-		 (unless (and (listp slot-names)
-			      (>= (length slot-names) 1)
-			      (every (lambda (x) (find x ',original-slot-names))
-				     slot-names))
-		   (error ,(format nil "~%~s:~%Invalid slot names. Must be a list of one or more of the following:~%~s~%You gave~~s" with original-slot-names)
-			  slot-names))
-		 (let ((inst (gensym "inst"))
-		       (lookup ',(mapcar #'cons original-slot-names slot-names)))
-		   `(let* ((,inst (get-item-from-%component-bag-at
-				   (entity-components ,entity) ,,id)))
-		      (declare (ignorable ,inst))
-		      (symbol-macrolet ,(mapcar λ`(,_ (,(cdr (assoc _ lookup))
-							,inst))
-						slot-names)
-			,@body))))
+	       ,(when original-slot-names
+		      `(defmacro ,with (slot-names entity &body body)
+			 (unless (and (listp slot-names)
+				      (>= (length slot-names) 1)
+				      (every (lambda (x) (find x ',original-slot-names))
+					     slot-names))
+			   (error ,(format nil "~%~s:~%Invalid slot names. Must be a list of one or more of the following:~%~s~%You gave~~s" with original-slot-names)
+				  slot-names))
+			 (let ((inst (gensym "inst"))
+			       (lookup ',(mapcar #'cons original-slot-names slot-names)))
+			   `(let* ((,inst (get-item-from-%component-bag-at
+					   (entity-components ,entity) ,,id)))
+			      (declare (ignorable ,inst))
+			      (symbol-macrolet ,(mapcar λ`(,_ (,(cdr (assoc _ lookup))
+								,inst))
+							slot-names)
+				,@body)))))
 
 	       ,@(mapcar λ`(defun ,_ (entity)
 			     (,_1 (get-item-from-%component-bag-at
@@ -207,32 +208,34 @@
 	       (defmethod %get-friends ((component ,name))
 		 ',friends)
 
-	       (defun ,update-component(entity &key ,@update-args)
-		 (let ((,component (get-item-from-%component-bag-at
-				    (entity-components entity) ,id)))
-		   ,@(mapcar
-		      λ`(when ,(third _1)
-			  (setf (,_ ,component) ,(first _1)))
-		      slot-names
-		      update-args)))
+	       ,(when original-slot-names
+		      `(defun ,update-component (entity &key ,@update-args)
+			 (let ((,component (get-item-from-%component-bag-at
+					    (entity-components entity) ,id)))
+			   ,@(mapcar
+			      λ`(when ,(third _1)
+				  (setf (,_ ,component) ,(first _1)))
+			      slot-names
+			      update-args))))
 
 	       (defun ,pass (,entity)
 		 ;; cant use our with-macro from earlier as it's not yet compiled
 		 ;; so we locally define it here and use it immediately
-		 (let ((,component (get-item-from-%component-bag-at
-				    (entity-components ,entity) ,id)))
-		   (symbol-macrolet ,(mapcar λ`(,_ (,_1 ,component))
-					     original-slot-names
-					     slot-names)
-
-		     (labels ((,update (&key ,@update-args)
-				,@(mapcar
-				   λ`(when ,(third _1)
-				       (setf (,_ ,component) ,(first _1)))
-				   slot-names
-				   update-args)))
-		       (declare (ignorable (function ,update)))
-		       ,@pass-body))))
+		 ,(if original-slot-names
+		      `(let ((,component (get-item-from-%component-bag-at
+					  (entity-components ,entity) ,id)))
+			 (symbol-macrolet ,(mapcar λ`(,_ (,_1 ,component))
+						   original-slot-names
+						   slot-names)
+			   (labels ((,update (&key ,@update-args)
+				      ,@(mapcar
+					 λ`(when ,(third _1)
+					     (setf (,_ ,component) ,(first _1)))
+					 slot-names
+					 update-args)))
+			     (declare (ignorable (function ,update)))
+			     ,@pass-body)))
+		      `(progn ,@pass-body)))
 
 	       (let ((created nil))
 		 (defun ,system-init ()
