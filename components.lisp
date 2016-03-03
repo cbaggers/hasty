@@ -174,11 +174,15 @@
 		    (entity-components entity-to-add-to) component ,id))
 		 (unless-release
 		   (setf (entity-dirty entity-to-add-to) t))
+		 (touch-entity-item all-entities entity-to-add-to
+				    :error-if-missing nil)
 		 entity-to-add-to)
 
 	       (defun ,remove (entity-to-remove-from)
 		 (remove-item-from-%component-bag-at
 		  (entity-components entity-to-remove-from) ,id)
+		 (touch-entity-item all-entities entity-to-remove-from
+				    :error-if-missing nil)
 		 entity-to-remove-from)
 
 	       ,(unless grab-bag::+release-mode+

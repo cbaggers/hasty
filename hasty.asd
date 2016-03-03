@@ -6,7 +6,7 @@
   :license "BSD 2 Clause"
   #+asdf-unicode :encoding #+asdf-unicode :utf-8
   :serial t
-  :depends-on (#:grab-bag #:fn)
+  :depends-on (#:grab-bag #:fn #:structy-defclass)
   :components ((:file "package")
                (:file "base")
 	       (:file "moot")
