@@ -59,12 +59,12 @@
 	     (getter-names (mapcar λ(symb name :- _) original-slot-names))
 
 	     (add-args (mapcar #'list original-slot-names init-vals))
-	     (add-pairs (mapcan λ`(,(kwd _) ,_1)
+	     (add-pairs (mapcat λ`(,(kwd _) ,_1)
 				slot-names
 				original-slot-names))
 
 	     (non-opt-init-args (mapcar #'list slot-names init-vals))
-	     (non-opt-init-pairs (mapcan λ`(,(kwd _) ,_) slot-names))
+	     (non-opt-init-pairs (mapcat λ`(,(kwd _) ,_) slot-names))
 
 	     (update-args (mapcar λ`(,_ nil ,(symb :set _)) original-slot-names))
 

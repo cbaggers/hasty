@@ -1,5 +1,11 @@
 (in-package #:hasty)
 (named-readtables:in-readtable fn:fn-reader)
+
+;;----------------------------------------------------------------------
+
+(defun mapcat (function &rest lists)
+  (reduce #'append (apply #'mapcar function lists) :initial-value nil))
+
 ;;----------------------------------------------------------------------
 
 (defgeneric component-name (component))
